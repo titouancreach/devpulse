@@ -2,7 +2,7 @@ import { Icon, MenuBarExtra, open, Color } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
 import { useState, useEffect } from "react";
 import { Array, Order, pipe } from "effect";
-import { Monoid } from "@effect/typeclass";
+import { Monoid, Semigroup } from "@effect/typeclass";
 import {
   type PullRequest,
   type ClaudeAgent,
@@ -103,31 +103,14 @@ interface Part {
 
 const Part = (count: number, suffix: string): Part => ({ count, suffix });
 
+const PartSemigroup: Semigroup.Semigroup<string> = Semigroup.make<string>(
+  (a, b) => (a === "" ? b : b === "" ? a : `${a} ${b}`)
+);
+
+const PartMonoid: Monoid.Monoid<string> = Monoid.fromSemigroup(PartSemigroup, "");
+
 const partToString = (part: Part): string =>
   part.count > 0 ? `${part.count}${part.suffix}` : "";
-
-const PartMonoid: Monoid.Monoid<string> = {
-  empty: "",
-  combine: (a, b) => {
-    if (a === "" ) return b;
-    if (b === "") return a;
-    return `${a} ${b}`;
-  },
-  combineMany: (self, collection) => {
-    let result = self;
-    for (const item of collection) {
-      result = result === "" ? item : item === "" ? result : `${result} ${item}`;
-    }
-    return result;
-  },
-  combineAll: (collection) => {
-    let result = "";
-    for (const item of collection) {
-      result = result === "" ? item : item === "" ? result : `${result} ${item}`;
-    }
-    return result;
-  },
-};
 
 const menuBarTitle = (data: ToolbarData): string =>
   pipe(
