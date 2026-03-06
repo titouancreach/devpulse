@@ -70,6 +70,9 @@ const enrichWithCwd = (pid: Pid) =>
           : `claude (pid ${pid})`) as ProjectName,
       });
     }),
+    Effect.tapError((e) =>
+      Effect.logWarning(`Failed to get cwd for pid ${pid}: ${e}`)
+    ),
     Effect.catchAll(() =>
       Effect.succeed(
         new ClaudeAgent({
@@ -104,6 +107,9 @@ const fetchAgentsProgram = pipe(
           pipe(
             Schema.decode(Pid)(pid),
             Effect.flatMap(enrichWithCwd),
+            Effect.tapError((e) =>
+              Effect.logWarning(`Failed to decode/enrich pid: ${e}`)
+            ),
             Effect.catchAll(() => Effect.succeed(null))
           ),
         { concurrency: 5 }
@@ -112,6 +118,9 @@ const fetchAgentsProgram = pipe(
         agents.filter((a): a is ClaudeAgent => a !== null)
       )
     )
+  ),
+  Effect.tapError((e) =>
+    Effect.logError(`Agent detection failed: ${e}`)
   ),
   Effect.catchAll(() => Effect.succeed([] as ReadonlyArray<ClaudeAgent>)),
   Effect.provide(NodeContext.layer)
