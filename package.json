@@ -1,0 +1,40 @@
+{
+  "name": "devpulse",
+  "title": "DevPulse",
+  "description": "GitHub PRs, CI status, and Claude agents in your menu bar",
+  "icon": "command-icon.png",
+  "author": "titouancreach",
+  "categories": [
+    "Developer Tools"
+  ],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "menu-bar",
+      "title": "DevPulse",
+      "description": "GitHub PRs, CI status, and Claude agents",
+      "mode": "menu-bar",
+      "interval": "30s"
+    }
+  ],
+  "dependencies": {
+    "@effect/platform": "^0.94.5",
+    "@effect/platform-node": "^0.104.1",
+    "@raycast/api": "^1.93.2",
+    "@raycast/utils": "^1.19.1",
+    "effect": "^3.14.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "@types/react": "^19.0.12",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "prepublishOnly": "echo \"Error: no publish\" && exit 1",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
