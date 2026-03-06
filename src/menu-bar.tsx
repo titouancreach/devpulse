@@ -82,16 +82,7 @@ const menuBarTitle = (data: ToolbarData): string => {
   return parts.length > 0 ? parts.join(" ") : "";
 };
 
-const menuBarIcon = (
-  myPRs: ReadonlyArray<PullRequest>
-): { source: Icon; tintColor?: Color } => {
-  const hasFailing = myPRs.some((pr) => pr.ciStatus === "failure");
-  const hasPending = myPRs.some((pr) => pr.ciStatus === "pending");
-
-  if (hasFailing) return { source: Icon.CodeBlock, tintColor: Color.Red };
-  if (hasPending) return { source: Icon.CodeBlock, tintColor: Color.Yellow };
-  return { source: Icon.CodeBlock, tintColor: Color.Green };
-};
+const menuBarIcon = "command-icon.png";
 
 function PRSection({
   prs,
@@ -144,7 +135,7 @@ export default function MenuBar() {
 
   return (
     <MenuBarExtra
-      icon={menuBarIcon(toolbarData.myPRs)}
+      icon={menuBarIcon}
       title={menuBarTitle(toolbarData)}
       isLoading={isLoading}
       tooltip="DevPulse"
