@@ -1,12 +1,39 @@
 import { Icon, MenuBarExtra, open, Color } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
+import { useState, useEffect } from "react";
+import { Array, Order, pipe } from "effect";
+import { Monoid } from "@effect/typeclass";
 import {
   type PullRequest,
   type ClaudeAgent,
   type CIStatus,
   type ReviewDecision,
+  type AgentStatus,
 } from "./domain";
 import { runFetchToolbarData, type ToolbarData } from "./program";
+
+const AgentStatusOrder: Order.Order<AgentStatus> = Order.make((a, b) =>
+  a === b ? 0 : a === "running" ? -1 : 1
+);
+
+const ClaudeAgentOrder: Order.Order<ClaudeAgent> = Order.mapInput(
+  AgentStatusOrder,
+  (agent: ClaudeAgent) => agent.status
+);
+
+const SPINNER_FRAMES = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
+
+const useSpinner = (active: boolean): string => {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const interval = setInterval(() => {
+      setFrame((f) => (f + 1) % SPINNER_FRAMES.length);
+    }, 120);
+    return () => clearInterval(interval);
+  }, [active]);
+  return active ? SPINNER_FRAMES[frame] : "";
+};
 
 const ciLabel = (status: CIStatus): string => {
   switch (status) {
@@ -69,18 +96,49 @@ const agentStatusIcon = (
   }
 };
 
-const menuBarTitle = (data: ToolbarData): string => {
-  const failing = data.myPRs.filter((pr) => pr.ciStatus === "failure").length;
-  const reviews = data.reviewPRs.length;
-  const running = data.agents.length;
+interface Part {
+  readonly count: number;
+  readonly suffix: string;
+}
 
-  const parts: string[] = [];
-  if (failing > 0) parts.push(`${failing}!`);
-  if (reviews > 0) parts.push(`${reviews}R`);
-  if (running > 0) parts.push(`${running}A`);
+const Part = (count: number, suffix: string): Part => ({ count, suffix });
 
-  return parts.length > 0 ? parts.join(" ") : "";
+const partToString = (part: Part): string =>
+  part.count > 0 ? `${part.count}${part.suffix}` : "";
+
+const PartMonoid: Monoid.Monoid<string> = {
+  empty: "",
+  combine: (a, b) => {
+    if (a === "" ) return b;
+    if (b === "") return a;
+    return `${a} ${b}`;
+  },
+  combineMany: (self, collection) => {
+    let result = self;
+    for (const item of collection) {
+      result = result === "" ? item : item === "" ? result : `${result} ${item}`;
+    }
+    return result;
+  },
+  combineAll: (collection) => {
+    let result = "";
+    for (const item of collection) {
+      result = result === "" ? item : item === "" ? result : `${result} ${item}`;
+    }
+    return result;
+  },
 };
+
+const menuBarTitle = (data: ToolbarData): string =>
+  pipe(
+    [
+      Part(pipe(data.myPRs, Array.filter((pr) => pr.ciStatus === "failure"), Array.length), "!"),
+      Part(Array.length(data.reviewPRs), "R"),
+      Part(pipe(data.agents, Array.filter((a) => a.status === "running"), Array.length), "A"),
+    ],
+    Array.map(partToString),
+    PartMonoid.combineAll,
+  );
 
 const menuBarIcon = "command-icon.png";
 
@@ -122,6 +180,24 @@ function PRSection({
   );
 }
 
+function AgentItem({ agent }: { readonly agent: ClaudeAgent }) {
+  const spinner = useSpinner(agent.status === "running");
+
+  return agent.status === "running" ? (
+    <MenuBarExtra.Item
+      title={`${spinner} ${agent.project}: Working`}
+      subtitle={agent.cwd as string}
+      onAction={() => {}}
+    />
+  ) : (
+    <MenuBarExtra.Item
+      icon={agentStatusIcon(agent.status)}
+      title={`${agent.project}: Idle`}
+      subtitle={agent.cwd as string}
+    />
+  );
+}
+
 export default function MenuBar() {
   const { data, isLoading } = useCachedPromise(runFetchToolbarData, [], {
     keepPreviousData: true,
@@ -156,15 +232,9 @@ export default function MenuBar() {
         {toolbarData.agents.length === 0 && (
           <MenuBarExtra.Item title="No agents running" />
         )}
-        {toolbarData.agents.map((agent) => (
-          <MenuBarExtra.Item
-            key={agent.pid}
-            icon={agentStatusIcon(agent.status)}
-            title={agent.project as string}
-            subtitle={`PID ${agent.pid}`}
-            tooltip={(agent.cwd as string) || "Unknown directory"}
-          />
-        ))}
+        {pipe(toolbarData.agents, Array.sortBy(ClaudeAgentOrder)).map((agent) => (
+            <AgentItem key={agent.pid} agent={agent} />
+          ))}
       </MenuBarExtra.Section>
     </MenuBarExtra>
   );

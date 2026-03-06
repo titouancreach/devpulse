@@ -20,6 +20,7 @@
   "dependencies": {
     "@effect/platform": "^0.94.5",
     "@effect/platform-node": "^0.104.1",
+    "@effect/typeclass": "^0.38.0",
     "@raycast/api": "^1.93.2",
     "@raycast/utils": "^1.19.1",
     "effect": "^3.14.8"
