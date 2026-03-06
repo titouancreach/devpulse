@@ -31,6 +31,13 @@ export const Pid = Schema.Number.pipe(
 );
 export type Pid = typeof Pid.Type;
 
+export const PositiveCount = Schema.Number.pipe(
+  Schema.int(),
+  Schema.positive(),
+  Schema.brand("PositiveCount")
+);
+export type PositiveCount = typeof PositiveCount.Type;
+
 export const DirectoryPath = Schema.String.pipe(Schema.brand("DirectoryPath"));
 export type DirectoryPath = typeof DirectoryPath.Type;
 

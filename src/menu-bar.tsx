@@ -1,7 +1,7 @@
 import { Icon, MenuBarExtra, open, Color } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
 import { useState, useEffect } from "react";
-import { Array, Order, pipe } from "effect";
+import { Array, Option, Order, pipe, Schema } from "effect";
 import { Monoid, Semigroup } from "@effect/typeclass";
 import {
   type PullRequest,
@@ -9,6 +9,7 @@ import {
   type CIStatus,
   type ReviewDecision,
   type AgentStatus,
+  PositiveCount,
 } from "./domain";
 import { runFetchToolbarData, type ToolbarData } from "./program";
 
@@ -96,32 +97,55 @@ const agentStatusIcon = (
   }
 };
 
-interface Part {
-  readonly count: number;
-  readonly suffix: string;
-}
-
-const Part = (count: number, suffix: string): Part => ({ count, suffix });
-
-const PartSemigroup: Semigroup.Semigroup<string> = Semigroup.make<string>(
-  (a, b) => (a === "" ? b : b === "" ? a : `${a} ${b}`)
+const SumPositive: Monoid.Monoid<Option.Option<PositiveCount>> = Monoid.fromSemigroup(
+  Semigroup.make((a, b) =>
+    pipe(
+      Option.all([a, b]),
+      Option.map(([x, y]) => (x + y) as unknown as PositiveCount),
+      Option.orElse(() => Option.orElse(a, () => b))
+    )
+  ),
+  Option.none()
 );
 
-const PartMonoid: Monoid.Monoid<string> = Monoid.fromSemigroup(PartSemigroup, "");
+interface MenuBarSummary {
+  readonly failing: Option.Option<PositiveCount>;
+  readonly reviews: Option.Option<PositiveCount>;
+  readonly agents: Option.Option<PositiveCount>;
+}
 
-const partToString = (part: Part): string =>
-  part.count > 0 ? `${part.count}${part.suffix}` : "";
+const MenuBarSummaryMonoid: Monoid.Monoid<MenuBarSummary> = Monoid.struct({
+  failing: SumPositive,
+  reviews: SumPositive,
+  agents: SumPositive,
+});
 
-const menuBarTitle = (data: ToolbarData): string =>
+const positiveOrNone = (n: number): Option.Option<PositiveCount> =>
+  Schema.decodeOption(PositiveCount)(n);
+
+const summaryFromData = (data: ToolbarData): MenuBarSummary => ({
+  failing: positiveOrNone(
+    pipe(data.myPRs, Array.filter((pr) => pr.ciStatus === "failure"), Array.length)
+  ),
+  reviews: positiveOrNone(Array.length(data.reviewPRs)),
+  agents: positiveOrNone(
+    pipe(data.agents, Array.filter((a) => a.status === "running"), Array.length)
+  ),
+});
+
+const summaryToString = (summary: MenuBarSummary): string =>
   pipe(
     [
-      Part(pipe(data.myPRs, Array.filter((pr) => pr.ciStatus === "failure"), Array.length), "!"),
-      Part(Array.length(data.reviewPRs), "R"),
-      Part(pipe(data.agents, Array.filter((a) => a.status === "running"), Array.length), "A"),
+      Option.map(summary.failing, (n) => `${n}!`),
+      Option.map(summary.reviews, (n) => `${n}R`),
+      Option.map(summary.agents, (n) => `${n}A`),
     ],
-    Array.map(partToString),
-    PartMonoid.combineAll,
+    Array.getSomes,
+    Array.join(" ")
   );
+
+const menuBarTitle = (data: ToolbarData): string =>
+  pipe(data, summaryFromData, summaryToString);
 
 const menuBarIcon = "command-icon.png";
 
