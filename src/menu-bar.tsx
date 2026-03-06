@@ -120,18 +120,32 @@ const MenuBarSummaryMonoid: Monoid.Monoid<MenuBarSummary> = Monoid.struct({
   agents: SumPositive,
 });
 
-const positiveOrNone = (n: number): Option.Option<PositiveCount> =>
-  Schema.decodeOption(PositiveCount)(n);
+const one = Schema.decodeOption(PositiveCount)(1);
 
-const summaryFromData = (data: ToolbarData): MenuBarSummary => ({
-  failing: positiveOrNone(
-    pipe(data.myPRs, Array.filter((pr) => pr.ciStatus === "failure"), Array.length)
-  ),
-  reviews: positiveOrNone(Array.length(data.reviewPRs)),
-  agents: positiveOrNone(
-    pipe(data.agents, Array.filter((a) => a.status === "running"), Array.length)
-  ),
+const summaryFromPR = (pr: PullRequest): MenuBarSummary => ({
+  failing: pr.ciStatus === "failure" ? one : Option.none(),
+  reviews: Option.none(),
+  agents: Option.none(),
 });
+
+const summaryFromReview = (_pr: PullRequest): MenuBarSummary => ({
+  failing: Option.none(),
+  reviews: one,
+  agents: Option.none(),
+});
+
+const summaryFromAgent = (agent: ClaudeAgent): MenuBarSummary => ({
+  failing: Option.none(),
+  reviews: Option.none(),
+  agents: agent.status === "running" ? one : Option.none(),
+});
+
+const summaryFromData = (data: ToolbarData): MenuBarSummary =>
+  MenuBarSummaryMonoid.combineAll([
+    ...pipe(data.myPRs, Array.map(summaryFromPR)),
+    ...pipe(data.reviewPRs, Array.map(summaryFromReview)),
+    ...pipe(data.agents, Array.map(summaryFromAgent)),
+  ]);
 
 const summaryToString = (summary: MenuBarSummary): string =>
   pipe(
